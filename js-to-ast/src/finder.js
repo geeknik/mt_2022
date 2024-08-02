@@ -5,16 +5,15 @@
  * @summary Part of js-to-ast library, contains functionality for finding vulnerabilities in AST.
  * @author Vojtěch Randýsek, xrandy00@vutbr.cz
  *
- * Created at     : 2022-05-06 21:29:18 
- * Last modified  : 2022-05-07 11:22:22
+ * Created at     : 2022-05-06 21:29:18
+ * Last modified  : 2024-08-02 14:50:00
  */
-
 
 // escodegen is a library for generating code from AST matching EsTree specification
 const escodegen = require("escodegen");
 // acorn is a parser library for JS, code in result matches EsTree specification
 const acorn = require("acorn");
-// one of many cryptographi libraries for JS, only SHA1 is used here
+// one of many cryptographic libraries for JS, only SHA1 is used here
 const crypto = require('crypto-js');
 // modified clone of acorn-walk for AST traversal
 const walk = require("./ast_walk");
@@ -23,7 +22,7 @@ const walk = require("./ast_walk");
 // returns normalized AST or false in case of error
 function tryParse(code) {
     try {
-        let ast = acorn.parse(code, { ecmaVersion: "latest", sourceType: "module" });
+        const ast = acorn.parse(code, { ecmaVersion: "latest", sourceType: "module" });
         return normalise(ast);
     } catch (error) {
         console.log(error);
@@ -34,18 +33,15 @@ function tryParse(code) {
 // helper method for patching AST
 // taken from https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript
 // the idea is to replace object with other object, without changing the references to original object from its parent
-// in C++ or simmilar languages it is possible to change the target of a pointer, in JS not
+// in C++ or similar languages it is possible to change the target of a pointer, in JS not
 // this hack keeps the refObj existing, deletes all of its properties and then clones all of the properties
 // from newObj
 function replaceReferencedObj(refObj, newObj) {
-    let keysR = Object.keys(refObj);
-    let keysN = Object.keys(newObj);
-    for (let i = 0; i < keysR.length; i++) {
-        delete refObj[keysR[i]];
-    }
-    for (let i = 0; i < keysN.length; i++) {
-        refObj[keysN[i]] = newObj[keysN[i]];
-    }
+    const keysR = Object.keys(refObj);
+    const keysN = Object.keys(newObj);
+
+    keysR.forEach(key => delete refObj[key]);
+    keysN.forEach(key => refObj[key] = newObj[key]);
 }
 
 // main function of this library, it detects and patches known vulnerabilities in AST
@@ -53,16 +49,17 @@ function replaceReferencedObj(refObj, newObj) {
 // vulnerabilities - object (pretty much a dictionary) of known vulnerabilities
 // patches - object of patches
 // meta - object of metadata
-// for specific format of vulnerabilities, patches and meta refer to run.js and 
+// for specific format of vulnerabilities, patches and meta refer to run.js and
 // generated_patches.json, generated_vulnerabilities_meta.json and generated_vulnerabilities.json
 function findMatches(input, vulnerabilities, patches, meta) {
     // start by parsing the input and forwarding possible error value
     const ast = tryParse(input);
-    if (ast == false) return false;
+    if (ast === false) return false;
+
     const foundVulnerabilities = [];
 
     // traverse the tree, process all of the nodes
-    // using other forms of traversal from acorn-walk library was actually slower then
+    // using other forms of traversal from acorn-walk library was actually slower than
     // processing all of the nodes, acorn-walk could use a little performance boost
     walk.full(ast, (node) => {
         const type = node.type;
@@ -73,9 +70,9 @@ function findMatches(input, vulnerabilities, patches, meta) {
             // To be able to hash the node, it has to be stringified first.
             // also remove unused properties 'start', 'end' and 'sourceType', they would corrupt the hash
             const asString = JSON.stringify(node, (k, v) => (k === 'start' || k === 'end' || k === 'sourceType') ? undefined : v);
-            // SHA1 was performing slightly better then MD5 on my setup, but any algorithm can be used
+            // SHA1 was performing slightly better than MD5 on my setup, but any algorithm can be used
             // however, if algorithm is changed all of the hashes need to be recalculated (DB re-creation)
-            const nodeHash = crypto.SHA1(asString); 
+            const nodeHash = crypto.SHA1(asString);
             // in dictionary vulnerabilitiesForType there is a second-level dictionary,
             // where vulnerabilities are indexed (key-ed) by their hashes
             const vulnerability = vulnerabilitiesForType[nodeHash];
@@ -90,8 +87,8 @@ function findMatches(input, vulnerabilities, patches, meta) {
                     // if patch was found replace the vulnerable Node (and the whole subtree)
                     // with a fixed one, without changing the parent reference
                     replaceReferencedObj(node, patch);
-                } 
-                
+                }
+
                 // as a last step access vulnerability metadata (separate dictionary to keep it simple and structured)
                 // and store it in the result list, continue to process next node
                 foundVulnerabilities.push(meta[vulnerability.id]);
@@ -103,19 +100,19 @@ function findMatches(input, vulnerabilities, patches, meta) {
         // in case there were vulnerabilities found the output script is generated
         // using escodegen library from (hopefully) patched AST
         const output = escodegen.generate(ast);
-        return {foundVulnerabilities: foundVulnerabilities, output: output};
+        return { foundVulnerabilities, output };
     }
 
     // if there were no vulnerabilities, there is no reason to generate new code,
     // just return original input with empty result
-    return {foundVulnerabilities: foundVulnerabilities, output: input};
+    return { foundVulnerabilities, output: input };
 }
 
 // helper function, not used in the library directly
 // iterates over all of the properties (keys) of two given objects
 // and compares them for deep equality
 // its intended use was for processing GIT commits - when two GIT commits (C1 and C2) are downloaded
-// we iterate over all of the files F1, F2 .. Fn in commit C1, find their mirror in C2 and we 
+// we iterate over all of the files F1, F2 .. Fn in commit C1, find their mirror in C2 and we
 // need to decide, whether the file changed or not. The simplest, naive, implementation is to
 // compute AST of both of them and compare them for equality by using this deepEqual method.
 // This method was created before hashing was introduced and stayed till the current state.
@@ -145,7 +142,7 @@ function isObject(object) {
     return object != null && typeof object === 'object';
 }
 
-// replace all single quotes in "str" with double quotes 
+// replace all single quotes in "str" with double quotes
 function normaliseQuotes(str) {
     const quote = "\"";
     if (str.startsWith("\'")) {
@@ -171,7 +168,7 @@ function normaliseVariableDeclarations(nodeList) {
         if (checkTypes(nodeList[i], nodeList[i + 1])) {
             // take all the declarations of both nodes, merge them and save them in the first node
             nodeList[i].declarations = mergeDeclarations(nodeList[i], nodeList[i + 1]);
-            nodeList.splice(i + 1, 1)
+            nodeList.splice(i + 1, 1);
         } else {
             i++;
         }
@@ -180,7 +177,7 @@ function normaliseVariableDeclarations(nodeList) {
     return nodeList;
 
     function checkTypes(node1, node2) {
-        return node1.type == 'VariableDeclaration' && node2.type == 'VariableDeclaration' && node1.kind == node2.kind;
+        return node1.type === 'VariableDeclaration' && node2.type === 'VariableDeclaration' && node1.kind === node2.kind;
     }
 
     function mergeDeclarations(dec1, dec2) {
@@ -207,7 +204,6 @@ function normalise(ast) {
         },
         BlockStatement(node) {
             node.body = normaliseVariableDeclarations(node.body);
-
         },
         StaticBlock(node) {
             node.body = normaliseVariableDeclarations(node.body);
@@ -222,4 +218,4 @@ module.exports = {
     findMatches,
     deepEqual,
     crypto
-}
+};
